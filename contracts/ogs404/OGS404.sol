@@ -30,6 +30,15 @@ contract OGS404 is Ownable, ERC404U16 {
   uint256 public constant MAX_SELL_TAX_RATE = 200; // 99%
   uint256 public constant MAX_SUPPLY = 1500;
 
+  uint256 public constant DEVELOPER_MINT_PERCENTAGE = 250; //25%
+  uint256 public constant FOUNDER_MINT_PERCENTAGE = 100; //10%
+  uint256 public constant DESIGNER_MINT_PERCENTAGE = 5; //10%
+
+  uint256 public constant DEVELOPER_TAX_PERCENTAGE = 50; //5%
+  uint256 public constant FOUNDER_TAX_PERCENTAGE = 50; //5%
+  uint256 public constant DESIGNER_TAX_PERCENTAGE = 30; //3%
+  uint256 public constant TEAM_TAX_PERCENTAGE = 170; //17%
+
   uint256 public constant BUY_TAX_MULTIPLIER = 10;
   uint256 public constant SELL_TAX_MULTIPLIER = 2;
 
@@ -45,6 +54,15 @@ contract OGS404 is Ownable, ERC404U16 {
   address public immutable TRADERJOE_FACTORY = address(0);
   address public immutable WAVAX = address(0);
   address public immutable PAIR_ADDRESS = address(0);
+
+  address public immutable DEVELOPER_WALLET = address(0);
+  address public immutable FOUNDER_WALLET = address(0);
+  address public immutable DESIGNER_WALLET = address(0);
+  address public immutable TREASURY_WALLET = address(0);
+  address public immutable TEAM_WALLET = address(0);
+
+
+
   // current mint phase
   MintPhase public mintPhase = MintPhase.Closed;
 
@@ -60,34 +78,46 @@ contract OGS404 is Ownable, ERC404U16 {
 
   constructor(
     address initialOwner_,
-    address liquidityRecipient_,
     address traderjoeRouter_,
     address traderjoeFactory_,
-    address wavax_
+    address wavax_,
+    address developerWallet_,
+    address founderWallet_,
+    address designerWallet_,
+    address teamWallet_,
+    address treasuryWallet_
   ) ERC404("OGS404", "OGS404", 18) Ownable(initialOwner_) {
     //We don't mint the ERC721s to the initial owner, as they are just going to 
     //be transferred to the liquidity pool.
 
     require( initialOwner_ != address(0), "OGS404: initialOwner_ cannot be the zero address");
-    require( liquidityRecipient_ != address(0), "OGS404: liquidityRecipient_ cannot be the zero address");
     require( traderjoeRouter_ != address(0), "OGS404: traderjoeRouter_ cannot be the zero address");
     require( traderjoeFactory_ != address(0), "OGS404: traderjoeFactory_ cannot be the zero address");
     require( wavax_ != address(0), "OGS404: wavax_ cannot be the zero address");
+    require( developerWallet_ != address(0), "OGS404: developerWallet_ cannot be the zero address");
+    require( founderWallet_ != address(0), "OGS404: founderWallet_ cannot be the zero address");
+    require( designerWallet_ != address(0), "OGS404: designerWallet_ cannot be the zero address");
+    require( teamWallet_ != address(0), "OGS404: teamWallet_ cannot be the zero address");
+    require( treasuryWallet_ != address(0), "OGS404: treasuryWallet_ cannot be the zero address");
 
-    _setERC721TransferExempt(initialMintRecipient_, true);
-    _setERC721TransferExempt(traderjoeRouter_, true);
-    _setERC721TransferExempt(traderjoeFactory_, true);
-    _mintERC20(liquidityRecipient_, LIQUIDITY_SUPPLY * units);
+    DEPLOYMENT_TIMESTAMP = block.timestamp;
 
     TRADERJOE_ROUTER = traderjoeRouter_;
     TRADERJOE_FACTORY = traderjoeFactory_;
     WAVAX = wavax_;
+    DEVELOPER_WALLET = developerWallet_;
+    FOUNDER_WALLET = founderWallet_;
+    DESIGNER_WALLET = designerWallet_;
+    TEAM_WALLET = teamWallet_;
+    TREASURY_WALLET = treasuryWallet_;
 
     PAIR_ADDRESS = computePairAddress();
 
+    _setERC721TransferExempt(initialMintRecipient_, true);
+    _setERC721TransferExempt(traderjoeRouter_, true);
+    _setERC721TransferExempt(traderjoeFactory_, true);
+    _mintERC20(initialOwner_, LIQUIDITY_SUPPLY * units);
     _setERC721TransferExempt(PAIR_ADDRESS, true);
-
-    DEPLOYMENT_TIMESTAMP = block.timestamp;
   }
 
   function tokenURI(uint256 id_) public pure override returns (string memory) {
@@ -218,7 +248,35 @@ function transferFrom(address from, address to, uint256 amount) public override 
 }
 
   function handleTax(uint256 taxAmount) internal {
-      // TODO: Implement tax handling, sending to a treasury or burning
+    uint256 developerTax = (taxAmount * DEVELOPER_TAX_PERCENTAGE) / 1000;
+    uint256 founderTax = (taxAmount * FOUNDER_TAX_PERCENTAGE) / 1000;
+    uint256 designerTax = (taxAmount * DESIGNER_TAX_PERCENTAGE) / 1000;
+    uint256 teamTax = (taxAmount * TEAM_TAX_PERCENTAGE) / 1000;
+
+    uint256 treasuryTax = taxAmount - developerTax - founderTax - designerTax - teamTax;
+
+    //transfer tax to wallets
+    transfer( DEVELOPER_WALLET, developerTax );
+    transfer( FOUNDER_WALLET, founderTax );
+    transfer( DESIGNER_WALLET, designerTax );
+    transfer( TEAM_WALLET, teamTax );
+    transfer( TREASURY_WALLET, treasuryTax );
+  }
+
+  function handleMintFunds(uint256 paidAvax) internal {
+    require(msg.value == paidAvax, "OGS404: Incorrect payment");
+
+    uint256 developerPayment = (paidAvax * DEVELOPER_MINT_PERCENTAGE) / 1000; // Adjusted for percentage
+    uint256 founderPayment = (paidAvax * FOUNDER_MINT_PERCENTAGE) / 1000;
+    uint256 designerPayment = (paidAvax * DESIGNER_MINT_PERCENTAGE) / 1000;
+    // Assuming treasury gets the remainder
+    uint256 treasuryPayment = paidAvax - (developerPayment + founderPayment + designerPayment);
+
+    // Transfer AVAX to each wallet
+    payable(DEVELOPER_WALLET).transfer(developerPayment);
+    payable(FOUNDER_WALLET).transfer(founderPayment);
+    payable(DESIGNER_WALLET).transfer(designerPayment);
+    payable(TREASURY_WALLET).transfer(treasuryPayment);
   }
 
   function computePairAddress()
@@ -243,7 +301,8 @@ function transferFrom(address from, address to, uint256 amount) public override 
   //Mint function for ERC721s
   function mint(
     uint256 quantity_
-  ) external {
+  ) external 
+    payable {
     require(_mintedSupply + LIQUIDITY_SUPPLY + _quantity <= MAX_SUPPLY, "OGS404: max supply reached");
     require(mintPhase != MintPhase.Closed, "OGS404: minting is closed");
 
@@ -254,9 +313,10 @@ function transferFrom(address from, address to, uint256 amount) public override 
       require(ogMintedForAddress[msg.sender] + quantity_ <= OGS_MINT_PER_WALLET, "OGS404: quantity exceeds limit");
       require(msg.value == OGS_MINT_PRICE * quantity_, "OGS404: incorrect value");
 
-      ogMintedForAddress[msg.sender] += quantity_;
-
       _mintERC20(msg.sender, quantity_ * units);
+
+      ogMintedForAddress[msg.sender] += quantity_;
+      _mintedSupply += quantity_;
     } else if ( mintPhase == MintPhase.Allowlist) {
       require(allowlist[msg.sender], "OGS404: sender not in allowlist");
       require(quantity_ <= ALLOWLIST_MINT_PER_WALLET, "OGS404: quantity exceeds limit");
@@ -266,17 +326,23 @@ function transferFrom(address from, address to, uint256 amount) public override 
       );
       require(msg.value == ALLOWLIST_MINT_PRICE * quantity_, "OGS404: incorrect value");
 
-      allowlistMintedForAddress[msg.sender] += quantity_;
-
       _mintERC20(msg.sender, quantity_ * units);
+
+      allowlistMintedForAddress[msg.sender] += quantity_;
+      _mintedSupply += quantity_;
     } else if ( mintPhase == MintPhase.Public) {
       require(quantity_ <= PUBLIC_MINT_PER_WALLET, "OGS404: quantity exceeds limit");
       require(msg.value == PUBLIC_MINT_PRICE * quantity_, "OGS404: incorrect value");
       require(publicMintedForAddress + quantity_ <= PUBLIC_MINT_PER_WALLET, "OGS404: quantity exceeds limit");
 
-      publicMintedForAddress[msg.sender] += quantity_;
-
       _mintERC20(msg.sender, quantity_ * units);
+
+      publicMintedForAddress[msg.sender] += quantity_;
+      _mintedSupply += quantity_;
+    }
+
+    if( msg.value > 0 ) {
+      handleMintFunds(msg.value);
     }
   }
 }
