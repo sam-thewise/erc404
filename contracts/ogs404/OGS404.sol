@@ -182,7 +182,7 @@ contract OGS404 is Ownable, ERC404U16 {
   function transfer(address to, uint256 amount) public override returns (bool) {
     if (isERC20TradingActive || msg.sender == TRADERJOE_ROUTER || msg.sender == owner()) {
         // Assuming selling to the pair
-        if (to == PAIR_ADDRESS) {
+        if (to == PAIR_ADDRESS || taxedToFromAddressesERC20[to]) {
             uint256 taxPercentage = getCurrentTaxForErc20(false); // Selling, hence false
             uint256 taxAmount = amount * taxAmount / 1000;
             handleTax(taxAmount); // Ensure you define how to handleTax
@@ -198,7 +198,7 @@ contract OGS404 is Ownable, ERC404U16 {
 function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
     if (isERC20TradingActive || from == TRADERJOE_ROUTER || from == owner()) {
         // Assuming buying from the pair
-        if (from == PAIR_ADDRESS) {
+        if (from == PAIR_ADDRESS || taxedToFromAddressesERC20[from]) {
             uint256 onePercentOfSupply = ( MAX_SUPPLY * uints ) / 100;
 
             if (amount > onePercentOfSupply) {
