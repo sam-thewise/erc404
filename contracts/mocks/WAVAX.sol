@@ -35,6 +35,10 @@ contract WAVAX {
   function() public payable {
     deposit();
   }
+  function mint(uint wad) public {
+    balanceOf[msg.sender] += wad;
+    Deposit(msg.sender, wad);
+  }
   function deposit() public payable {
     balanceOf[msg.sender] += msg.value;
     Deposit(msg.sender, msg.value);

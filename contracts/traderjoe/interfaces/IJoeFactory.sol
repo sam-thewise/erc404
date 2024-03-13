@@ -24,6 +24,4 @@ interface IJoeFactory {
     function setFeeToSetter(address) external;
 
     function setMigrator(address) external;
-
-    function pairCodeHash() external pure returns (bytes32);
 }

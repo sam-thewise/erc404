@@ -30,7 +30,7 @@ library JoeLibrary {
                         hex"ff",
                         factory,
                         keccak256(abi.encodePacked(token0, token1)),
-                        hex"0bbca9af0511ad1a1da383135cf3a8d2ac620e549ef9f6ae3a4c33c2fed0af91" // init code fuji
+                        hex"45d4ba7cede54f351a6da276a40fa8b9916c368dac0c5b07d552b49f99e4b406" // init code hardhat for tests
                     )
                 )
             )

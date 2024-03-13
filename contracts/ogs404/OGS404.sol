@@ -3,10 +3,10 @@ pragma solidity ^0.8.19;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
-import {ERC404U16} from "../ERC404U16.sol";
-import {IJoeFactory} from "../interfaces/IJoeFactory.sol";
+import {ERC404} from "../ERC404.sol";
+import {IFactory} from "../interfaces/IFactory.sol";
 
-contract OGS404 is Ownable, ERC404U16 {
+contract OGS404 is Ownable, ERC404 {
   event TaxedToFromAddressERC20Set( address indexed taxedToFromAdress, bool value);
   event OGAllowlistSet(address indexed account, bool value);
   event AllowlistSet(address indexed account, bool value);
@@ -84,7 +84,7 @@ contract OGS404 is Ownable, ERC404U16 {
     address designerWallet_,
     address teamWallet_,
     address treasuryWallet_
-  ) ERC404U16("OGS404", "OGS404", 18) Ownable(initialOwner_) {
+  ) ERC404("OGS404", "OGS404", 18) Ownable(initialOwner_) {
     //We don't mint the ERC721s to the initial owner, as they are just going to 
     //be transferred to the liquidity pool.
 
@@ -112,8 +112,6 @@ contract OGS404 is Ownable, ERC404U16 {
     PAIR_ADDRESS = computePairAddress();
 
     _setERC721TransferExempt(initialOwner_, true);
-    _setERC721TransferExempt(traderjoeRouter_, true);
-    _setERC721TransferExempt(traderjoeFactory_, true);
     _mintERC20(initialOwner_, LIQUIDITY_SUPPLY * units);
     _setERC721TransferExempt(PAIR_ADDRESS, true);
   }
@@ -212,7 +210,6 @@ contract OGS404 is Ownable, ERC404U16 {
             handleTax(taxAmount); // Ensure you define how to handleTax
             amount -= taxAmount;
         }
-
         return super.transfer(to, amount);
     } else {
         revert("OGS404: Trading is not active.");
@@ -234,7 +231,6 @@ function transferFrom(address from, address to, uint256 amount) public override 
             handleTax(taxAmount); // Define this function to manage tax
             amount -= taxAmount;
         }
-
         return super.transferFrom(from, to, amount);
     } else {
         revert("OGS404: Trading is not active.");
@@ -279,7 +275,7 @@ function transferFrom(address from, address to, uint256 amount) public override 
       returns (address pair)
   {
       (address token0, address token1) = address(this) < WAVAX ? (address(this), WAVAX) : (WAVAX, address(this));
-      bytes32 pairCodeHash = IJoeFactory(TRADERJOE_FACTORY).pairCodeHash();
+      bytes32 pairCodeHash = IFactory(TRADERJOE_FACTORY).pairCodeHash();
       bytes32 salt = keccak256(abi.encodePacked(token0, token1));
       bytes32 data = keccak256(
           abi.encodePacked(

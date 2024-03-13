@@ -23,7 +23,7 @@ contract JoeFactory is IJoeFactory {
         return allPairs.length;
     }
 
-    function pairCodeHash() external pure override returns (bytes32) {
+    function pairCodeHash() external pure returns (bytes32) {
         return keccak256(type(JoePair).creationCode);
     }
 
