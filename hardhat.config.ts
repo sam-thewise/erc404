@@ -6,13 +6,35 @@ import { ethers } from "ethers"
 
 const config: HardhatUserConfig = {
   solidity: { 
-    compilers: [{ version: "0.8.20" }, { version: "0.4.18" }],
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200,
-      },
-    }
+    compilers: [
+      { 
+        version: "0.8.20",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 300,
+          },
+        }
+      }, 
+      { 
+        version: "0.6.12",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 300,
+          },
+        }
+      }, 
+      { 
+        version: "0.4.18",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 300,
+          },
+        }
+      }
+    ],
   },
   gasReporter: {
     currency: "USD",
@@ -23,7 +45,7 @@ const config: HardhatUserConfig = {
     hardhat: {
       accounts: {
         count: 300
-      }
+      },
     },
     fuji: {
       url: process.env.FUJI_URL,
