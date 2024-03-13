@@ -7,13 +7,13 @@ import {ERC404U16} from "../ERC404U16.sol";
 import {IJoeFactory} from "../interfaces/IJoeFactory.sol";
 
 contract OGS404 is Ownable, ERC404U16 {
-  event setTaxedToFromAddressERC20( address indexed taxedToFromAdress, bool value);
-  event ogAllowlistSet(address indexed account, bool value);
-  event allowlistSet(address indexed account, bool value);
-  event bulkOgAllowlistSet(address[] accounts, bool value);
-  event bulkAllowlistSet(address[] accounts, bool value);
-  event mintPhaseSet(MintPhase mintPhase);
-  event setERC20TradingActive(bool value);
+  event TaxedToFromAddressERC20Set( address indexed taxedToFromAdress, bool value);
+  event OGAllowlistSet(address indexed account, bool value);
+  event AllowlistSet(address indexed account, bool value);
+  event BulkOgAllowlistSet(address[] accounts, bool value);
+  event BulkAllowlistSet(address[] accounts, bool value);
+  event MintPhaseSet(MintPhase mintPhase);
+  event ERC20TradingActiveSet();
 
   enum MintPhase {
     Closed,
@@ -49,19 +49,17 @@ contract OGS404 is Ownable, ERC404U16 {
   uint256 public constant PUBLIC_MINT_PRICE = 0.7 ether;
   uint256 public constant PUBLIC_MINT_PER_WALLET = 10;
 
-  uint256 public immutable DEPLOYMENT_TIMESTAMP = 0;
-  address public immutable TRADERJOE_ROUTER = address(0);
-  address public immutable TRADERJOE_FACTORY = address(0);
-  address public immutable WAVAX = address(0);
-  address public immutable PAIR_ADDRESS = address(0);
+  uint256 public immutable DEPLOYMENT_TIMESTAMP;
+  address public immutable TRADERJOE_ROUTER;
+  address public immutable TRADERJOE_FACTORY;
+  address public immutable WAVAX;
+  address public immutable PAIR_ADDRESS;
 
-  address public immutable DEVELOPER_WALLET = address(0);
-  address public immutable FOUNDER_WALLET = address(0);
-  address public immutable DESIGNER_WALLET = address(0);
-  address public immutable TREASURY_WALLET = address(0);
-  address public immutable TEAM_WALLET = address(0);
-
-
+  address public immutable DEVELOPER_WALLET;
+  address public immutable FOUNDER_WALLET;
+  address public immutable DESIGNER_WALLET;
+  address public immutable TREASURY_WALLET;
+  address public immutable TEAM_WALLET;
 
   // current mint phase
   MintPhase public mintPhase = MintPhase.Closed;
@@ -86,7 +84,7 @@ contract OGS404 is Ownable, ERC404U16 {
     address designerWallet_,
     address teamWallet_,
     address treasuryWallet_
-  ) ERC404("OGS404", "OGS404", 18) Ownable(initialOwner_) {
+  ) ERC404U16("OGS404", "OGS404", 18) Ownable(initialOwner_) {
     //We don't mint the ERC721s to the initial owner, as they are just going to 
     //be transferred to the liquidity pool.
 
@@ -113,7 +111,7 @@ contract OGS404 is Ownable, ERC404U16 {
 
     PAIR_ADDRESS = computePairAddress();
 
-    _setERC721TransferExempt(initialMintRecipient_, true);
+    _setERC721TransferExempt(initialOwner_, true);
     _setERC721TransferExempt(traderjoeRouter_, true);
     _setERC721TransferExempt(traderjoeFactory_, true);
     _mintERC20(initialOwner_, LIQUIDITY_SUPPLY * units);
@@ -135,13 +133,13 @@ contract OGS404 is Ownable, ERC404U16 {
 
     taxedToFromAddressesERC20[taxedToFrom_] = value_;
 
-    emit setTaxedToFromAddressERC20(taxedToFrom_, value_);
+    emit TaxedToFromAddressERC20Set(taxedToFrom_, value_);
   }
 
   function setOgAllowlist(address account_, bool value_) external onlyOwner {
     ogAllowlist[account_] = value_;
 
-    emit ogAllowlistSet(account_, value_);
+    emit OGAllowlistSet(account_, value_);
   }
 
   function bulkSetOgAllowlist(address[] calldata accounts_, bool value_) external onlyOwner {
@@ -149,13 +147,13 @@ contract OGS404 is Ownable, ERC404U16 {
       ogAllowlist[accounts_[i]] = value_;
     }
 
-    emit bulkOgAllowlistSet(accounts_, value_);
+    emit BulkOgAllowlistSet(accounts_, value_);
   }
 
   function setAllowlist(address account_, bool value_) external onlyOwner {
     allowlist[account_] = value_;
 
-    emit allowlistSet(account_, value_);
+    emit AllowlistSet(account_, value_);
   }
 
   function bulkSetAllowlist(address[] calldata accounts_, bool value_) external onlyOwner {
@@ -163,20 +161,16 @@ contract OGS404 is Ownable, ERC404U16 {
       allowlist[accounts_[i]] = value_;
     }
 
-    emit bulkAllowlistSet(accounts_, value_);
+    emit BulkAllowlistSet(accounts_, value_);
   }
 
   function setMintPhase(MintPhase mintPhase_) external onlyOwner {
     mintPhase = mintPhase_;
 
-    emit mintPhaseSet(mintPhase_);
+    emit MintPhaseSet(mintPhase_);
   }
 
-  function getCurrentTaxForErc20( bool _isBuy ) external view returns (uint256) {
-    if (taxedToFromAddress == address(0)) {
-      return 0;
-    }
-
+  function getCurrentTaxForERC20( bool _isBuy ) public view returns (uint256) {
     uint256 timeSinceDeployment = block.timestamp - DEPLOYMENT_TIMESTAMP;
 
     uint256 taxRateMultiplier = _isBuy ? BUY_TAX_MULTIPLIER : SELL_TAX_MULTIPLIER;
@@ -206,15 +200,15 @@ contract OGS404 is Ownable, ERC404U16 {
 
     isERC20TradingActive = true;
 
-    emit setERC20TradingActive(value_);
+    emit ERC20TradingActiveSet();
   }
 
   function transfer(address to, uint256 amount) public override returns (bool) {
     if (isERC20TradingActive || msg.sender == TRADERJOE_ROUTER || msg.sender == owner()) {
         // Assuming selling to the pair
         if (to == PAIR_ADDRESS || taxedToFromAddressesERC20[to]) {
-            uint256 taxPercentage = getCurrentTaxForErc20(false); // Selling, hence false
-            uint256 taxAmount = amount * taxAmount / 1000;
+            uint256 taxPercentage = getCurrentTaxForERC20(false); // Selling, hence false
+            uint256 taxAmount = amount * taxPercentage / 1000;
             handleTax(taxAmount); // Ensure you define how to handleTax
             amount -= taxAmount;
         }
@@ -229,14 +223,14 @@ function transferFrom(address from, address to, uint256 amount) public override 
     if (isERC20TradingActive || from == TRADERJOE_ROUTER || from == owner()) {
         // Assuming buying from the pair
         if (from == PAIR_ADDRESS || taxedToFromAddressesERC20[from]) {
-            uint256 onePercentOfSupply = ( MAX_SUPPLY * uints ) / 100;
+            uint256 onePercentOfSupply = ( MAX_SUPPLY * units ) / 100;
 
             if (amount > onePercentOfSupply) {
                 revert("OGS404: antiwhale: amount exceeds 1% of supply");
             }
 
-            uint256 taxPercentage = getCurrentTaxForErc20(true); // Buying, hence true
-            uint256 axAmount = amount * taxAmount / 1000;
+            uint256 taxPercentage = getCurrentTaxForERC20(true); // Buying, hence true
+            uint256 taxAmount = amount * taxPercentage / 1000;
             handleTax(taxAmount); // Define this function to manage tax
             amount -= taxAmount;
         }
@@ -281,7 +275,7 @@ function transferFrom(address from, address to, uint256 amount) public override 
 
   function computePairAddress()
       internal
-      pure
+      view
       returns (address pair)
   {
       (address token0, address token1) = address(this) < WAVAX ? (address(this), WAVAX) : (WAVAX, address(this));
@@ -303,7 +297,7 @@ function transferFrom(address from, address to, uint256 amount) public override 
     uint256 quantity_
   ) external 
     payable {
-    require(_mintedSupply + LIQUIDITY_SUPPLY + _quantity <= MAX_SUPPLY, "OGS404: max supply reached");
+    require(_mintedSupply + LIQUIDITY_SUPPLY + quantity_ <= MAX_SUPPLY, "OGS404: max supply reached");
     require(mintPhase != MintPhase.Closed, "OGS404: minting is closed");
 
     if( mintPhase == MintPhase.OG ) {
@@ -333,7 +327,7 @@ function transferFrom(address from, address to, uint256 amount) public override 
     } else if ( mintPhase == MintPhase.Public) {
       require(quantity_ <= PUBLIC_MINT_PER_WALLET, "OGS404: quantity exceeds limit");
       require(msg.value == PUBLIC_MINT_PRICE * quantity_, "OGS404: incorrect value");
-      require(publicMintedForAddress + quantity_ <= PUBLIC_MINT_PER_WALLET, "OGS404: quantity exceeds limit");
+      require(publicMintedForAddress[msg.sender] + quantity_ <= PUBLIC_MINT_PER_WALLET, "OGS404: quantity exceeds limit");
 
       _mintERC20(msg.sender, quantity_ * units);
 
