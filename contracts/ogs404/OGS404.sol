@@ -6,6 +6,9 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {ERC404} from "../ERC404.sol";
 import {IFactory} from "../interfaces/IFactory.sol";
 
+//add hardhat console.log
+import "hardhat/console.sol";
+
 contract OGS404 is Ownable, ERC404 {
   event TaxedToFromAddressERC20Set( address indexed taxedToFromAdress, bool value);
   event OGAllowlistSet(address indexed account, bool value);
@@ -202,13 +205,20 @@ contract OGS404 is Ownable, ERC404 {
   }
 
   function transfer(address to, uint256 amount) public override returns (bool) {
-    if (isERC20TradingActive || msg.sender == TRADERJOE_ROUTER || msg.sender == owner()) {
-        // Assuming selling to the pair
-        if (to == PAIR_ADDRESS || taxedToFromAddressesERC20[to]) {
-            uint256 taxPercentage = getCurrentTaxForERC20(false); // Selling, hence false
+    // trading must be active or the sender must be the router or the owner
+    if (isERC20TradingActive || msg.sender == owner()) {
+        //if the pair is transferring OGS404 to the buyer
+        if ( msg.sender == PAIR_ADDRESS || taxedToFromAddressesERC20[msg.sender] && amount > 0) {
+            uint256 onePercentOfSupply = ( MAX_SUPPLY * units ) / 100;
+
+            if (amount > onePercentOfSupply) {
+                revert("OGS404: antiwhale: amount exceeds 1% of supply");
+            }
+
+            uint256 taxPercentage = getCurrentTaxForERC20(true);
             uint256 taxAmount = amount * taxPercentage / 1000;
-            handleTax(taxAmount); // Ensure you define how to handleTax
             amount -= taxAmount;
+            handleTaxBuy(taxAmount); // Ensure you define how to handleTax
         }
         return super.transfer(to, amount);
     } else {
@@ -218,18 +228,25 @@ contract OGS404 is Ownable, ERC404 {
 
 function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
     if (isERC20TradingActive || from == TRADERJOE_ROUTER || from == owner()) {
-        // Assuming buying from the pair
-        if (from == PAIR_ADDRESS || taxedToFromAddressesERC20[from]) {
-            uint256 onePercentOfSupply = ( MAX_SUPPLY * units ) / 100;
-
-            if (amount > onePercentOfSupply) {
-                revert("OGS404: antiwhale: amount exceeds 1% of supply");
-            }
-
-            uint256 taxPercentage = getCurrentTaxForERC20(true); // Buying, hence true
+        // Assuming buying from the pair through the router
+        if (msg.sender == TRADERJOE_ROUTER || taxedToFromAddressesERC20[msg.sender]) {
+          console.log("transferFrom pair", PAIR_ADDRESS);
+          console.log("transferFrom sender", msg.sender);
+          console.log("transferFrom from", from);
+          console.log("transferFrom to", to);
+          console.log("transferFrom amount", amount);
+          console.log("transferFrom router", TRADERJOE_ROUTER);
+          console.log("transferFrom factory", TRADERJOE_FACTORY);
+          console.log("transferFrom wavax", WAVAX);
+          
+          //owner is excluded as they need to add liquidity initially
+          if( from != owner() ) {
+            uint256 taxPercentage = getCurrentTaxForERC20(false);
+            console.log("transferFrom taxPercentage", taxPercentage);
             uint256 taxAmount = amount * taxPercentage / 1000;
-            handleTax(taxAmount); // Define this function to manage tax
             amount -= taxAmount;
+            handleTaxSell(from, taxAmount); // Define this function to manage tax
+          }
         }
         return super.transferFrom(from, to, amount);
     } else {
@@ -237,20 +254,34 @@ function transferFrom(address from, address to, uint256 amount) public override 
     }
 }
 
-  function handleTax(uint256 taxAmount) internal {
+  function handleTaxBuy(uint256 taxAmount) internal {
     uint256 developerTax = (taxAmount * DEVELOPER_TAX_PERCENTAGE) / 1000;
     uint256 founderTax = (taxAmount * FOUNDER_TAX_PERCENTAGE) / 1000;
     uint256 designerTax = (taxAmount * DESIGNER_TAX_PERCENTAGE) / 1000;
     uint256 teamTax = (taxAmount * TEAM_TAX_PERCENTAGE) / 1000;
-
     uint256 treasuryTax = taxAmount - developerTax - founderTax - designerTax - teamTax;
 
     //transfer tax to wallets
-    transfer( DEVELOPER_WALLET, developerTax );
-    transfer( FOUNDER_WALLET, founderTax );
-    transfer( DESIGNER_WALLET, designerTax );
-    transfer( TEAM_WALLET, teamTax );
-    transfer( TREASURY_WALLET, treasuryTax );
+    super.transfer( DEVELOPER_WALLET, developerTax );
+    super.transfer( FOUNDER_WALLET, founderTax );
+    super.transfer( DESIGNER_WALLET, designerTax );
+    super.transfer( TEAM_WALLET, teamTax );
+    super.transfer( TREASURY_WALLET, treasuryTax );
+  }
+
+  function handleTaxSell(address from, uint256 taxAmount) internal {
+    uint256 developerTax = (taxAmount * DEVELOPER_TAX_PERCENTAGE) / 1000;
+    uint256 founderTax = (taxAmount * FOUNDER_TAX_PERCENTAGE) / 1000;
+    uint256 designerTax = (taxAmount * DESIGNER_TAX_PERCENTAGE) / 1000;
+    uint256 teamTax = (taxAmount * TEAM_TAX_PERCENTAGE) / 1000;
+    uint256 treasuryTax = taxAmount - developerTax - founderTax - designerTax - teamTax;
+
+    //transfer tax to wallets
+    super.transferFrom( from, DEVELOPER_WALLET, developerTax );
+    super.transferFrom( from, FOUNDER_WALLET, founderTax );
+    super.transferFrom( from, DESIGNER_WALLET, designerTax );
+    super.transferFrom( from, TEAM_WALLET, teamTax );
+    super.transferFrom( from, TREASURY_WALLET, treasuryTax );
   }
 
   function handleMintFunds(uint256 paidAvax) internal {

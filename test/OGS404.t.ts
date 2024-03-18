@@ -335,6 +335,149 @@ describe("OGS404", function () {
       expect( await f.contract.erc721BalanceOf(f.userWallets.publicUser) ).to.be.greaterThan(0)
       
     })
+    it("Buy tax should be applied once trading is turned on and 1 week has passed", async function () {
+      const f = await loadFixture(deployOGS404)
+
+      const liquidityAmount = ethers.parseUnits('380', 18)
+
+      //get the current block
+      let block = await network.provider.send("eth_getBlockByNumber", ["latest", false])
+      let blockTimestamp = parseInt(block.timestamp)
+
+      await f.joeRouter.connect(f.teamWallets.owner).addLiquidity(
+        f.joePairToken0,
+        f.joePairToken1,
+        liquidityAmount,
+        liquidityAmount,
+        liquidityAmount - ethers.parseUnits('1', 17),
+        liquidityAmount - ethers.parseUnits('1', 17),
+        f.teamWallets.owner.address,
+        blockTimestamp + 30000
+      )
+
+      //turn on trading
+      await f.contract.connect(f.teamWallets.owner).setERC20TradingActive()
+
+      // mint some wavax to the public user
+      await f.wavax.connect(f.userWallets.publicUser).mint( ethers.parseUnits('20', 18) )
+
+      //approve the joe router to spend the wavax
+      await f.wavax.connect(f.userWallets.publicUser).approve(f.joeRouterAddress, ethers.MaxUint256)
+
+      //move the block time forward by 7 days
+      await time.increase(60 * 60 * 24 * 7)
+
+      //get the current block after time increase
+      block = await network.provider.send("eth_getBlockByNumber", ["latest", false])
+      blockTimestamp = parseInt(block.timestamp)
+
+      //get the balance of the ogs404 in the liquidity pool before we do the swap
+      const ogs404BalanceOfPair = await f.contract.erc20BalanceOf(f.joePairAddress)
+
+      //try to swap some wavax for ogs404
+      await f.joeRouter.connect(f.userWallets.publicUser).swapExactTokensForTokens(
+          ethers.parseUnits('2', 18),
+          ethers.parseUnits('1', 18),
+          [f.wavaxAddress, f.contractAddress],
+          f.userWallets.publicUser.address,
+          blockTimestamp + 30000
+      )
+
+      //get the balance of the ogs404 in the liquidity pool after we do the swap
+      const ogs404BalanceOfPairAfter = await f.contract.erc20BalanceOf(f.joePairAddress)
+
+      const totalTakeFromPair = ogs404BalanceOfPair - ogs404BalanceOfPairAfter
+
+      //now get the user's balance of ogs404
+      const userBalance = await f.contract.erc20BalanceOf(f.userWallets.publicUser.address)
+
+      expect( totalTakeFromPair - userBalance ).to.be.greaterThan(0)
+    })
+    it("Sell tax should be applied once trading is turned on and 1 week has passed", async function () {
+      const f = await loadFixture(deployOGS404)
+
+      const liquidityAmount = ethers.parseUnits('380', 18)
+
+      //get the current block
+      let block = await network.provider.send("eth_getBlockByNumber", ["latest", false])
+      let blockTimestamp = parseInt(block.timestamp)
+
+      await f.joeRouter.connect(f.teamWallets.owner).addLiquidity(
+        f.joePairToken0,
+        f.joePairToken1,
+        liquidityAmount,
+        liquidityAmount,
+        liquidityAmount - ethers.parseUnits('1', 17),
+        liquidityAmount - ethers.parseUnits('1', 17),
+        f.teamWallets.owner.address,
+        blockTimestamp + 30000
+      )
+
+      //turn on trading
+      await f.contract.connect(f.teamWallets.owner).setERC20TradingActive()
+
+      // mint some wavax to the public user
+      await f.wavax.connect(f.userWallets.publicUser).mint( ethers.parseUnits('20', 18) )
+
+      //approve the joe router to spend the wavax
+      await f.wavax.connect(f.userWallets.publicUser).approve(f.joeRouterAddress, ethers.MaxUint256)
+
+      //move the block time forward by 7 days
+      await time.increase(60 * 60 * 24 * 7)
+
+      //get the current block after time increase
+      block = await network.provider.send("eth_getBlockByNumber", ["latest", false])
+      blockTimestamp = parseInt(block.timestamp)
+
+      //get the balance of the ogs404 in the liquidity pool before we do the swap
+      const ogs404BalanceOfPair = await f.contract.erc20BalanceOf(f.joePairAddress)
+
+      //try to swap some wavax for ogs404
+      await f.joeRouter.connect(f.userWallets.publicUser).swapExactTokensForTokens(
+          ethers.parseUnits('2', 18),
+          ethers.parseUnits('1', 18),
+          [f.wavaxAddress, f.contractAddress],
+          f.userWallets.publicUser.address,
+          blockTimestamp + 30000
+      )
+
+      //get the balance of the ogs404 in the liquidity pool after we do the swap
+      const ogs404BalanceOfPairAfter = await f.contract.erc20BalanceOf(f.joePairAddress)
+
+      const totalTakeFromPair = ogs404BalanceOfPair - ogs404BalanceOfPairAfter
+
+      //now get the user's balance of ogs404
+      const userBalance = await f.contract.erc20BalanceOf(f.userWallets.publicUser.address)
+
+      expect( totalTakeFromPair - userBalance ).to.be.greaterThan(0)
+
+      //approve the joe router to spend the ogs404
+      await f.contract.connect(f.userWallets.publicUser).approve(f.joeRouterAddress, ethers.MaxUint256)
+
+      //get the balance of the ogs404 in the liquidity pool before we do the swap
+      const ogs404BalanceOfPair2 = await f.contract.erc20BalanceOf(f.joePairAddress)
+
+      console.log('user balance: ', userBalance)
+      console.log('output', userBalance - ethers.parseUnits('5', 17))
+
+      //try to swap some ogs404 for wavax
+      await f.joeRouter.connect(f.userWallets.publicUser).swapExactTokensForTokensSupportingFeeOnTransferTokens(
+          userBalance,
+          userBalance - ethers.parseUnits('5', 17),
+          [f.contractAddress, f.wavaxAddress],
+          f.userWallets.publicUser.address,
+          blockTimestamp + 30000
+      )
+
+      //get the balance of the ogs404 in the liquidity pool after we do the swap
+      const ogs404BalanceOfPairAfter2 = await f.contract.erc20BalanceOf(f.joePairAddress)
+
+      const totalSentToSellLP = ogs404BalanceOfPairAfter2 - ogs404BalanceOfPair2
+
+      const totalTakenInTax = userBalance - totalSentToSellLP
+
+      expect( totalTakenInTax ).to.be.greaterThan(0)
+    })
     it("Owner should be able to change phase to OG minting phase", async function () {
       const f = await loadFixture(deployOGS404)
 
