@@ -6,9 +6,6 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {ERC404} from "../ERC404.sol";
 import {IFactory} from "../interfaces/IFactory.sol";
 
-//add hardhat console.log
-import "hardhat/console.sol";
-
 contract OGS404 is Ownable, ERC404 {
   event TaxedToFromAddressERC20Set( address indexed taxedToFromAdress, bool value);
   event OGAllowlistSet(address indexed account, bool value);
@@ -230,19 +227,9 @@ function transferFrom(address from, address to, uint256 amount) public override 
     if (isERC20TradingActive || from == TRADERJOE_ROUTER || from == owner()) {
         // Assuming buying from the pair through the router
         if (msg.sender == TRADERJOE_ROUTER || taxedToFromAddressesERC20[msg.sender]) {
-          console.log("transferFrom pair", PAIR_ADDRESS);
-          console.log("transferFrom sender", msg.sender);
-          console.log("transferFrom from", from);
-          console.log("transferFrom to", to);
-          console.log("transferFrom amount", amount);
-          console.log("transferFrom router", TRADERJOE_ROUTER);
-          console.log("transferFrom factory", TRADERJOE_FACTORY);
-          console.log("transferFrom wavax", WAVAX);
-          
           //owner is excluded as they need to add liquidity initially
           if( from != owner() ) {
             uint256 taxPercentage = getCurrentTaxForERC20(false);
-            console.log("transferFrom taxPercentage", taxPercentage);
             uint256 taxAmount = amount * taxPercentage / 1000;
             amount -= taxAmount;
             handleTaxSell(from, taxAmount); // Define this function to manage tax
